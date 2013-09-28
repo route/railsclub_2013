@@ -1,0 +1,47 @@
+article table {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: none;
+}
+article table td {
+  border: none;
+  vertical-align: middle;
+  text-align: center;
+}
+article ul {
+  text-align: left;
+  font-size: 130%;
+}
+article ul li ul {
+  font-size: 100%;
+  margin-top: 1% !important;
+}
+article.part h1 {
+  color: #FFFFFF;
+  padding: 25px;
+  margin: 0;
+  background-color: #CBE86B;
+  line-height: 70px;
+}
+article h1, article h3 {
+  margin: 0;
+  padding: 0;
+  text-align: center;
+}
+article div.notes {
+  display: none;
+}
+article pre.executable {
+  border: 3px solid #CBE86B;
+}
+article:not(.nobackground) {
+  background: url(/images/railsclub.png) right+1% bottom+2% no-repeat !important;
+  background-color: white !important;
+}
+article pre {
+  text-align: left;
+  padding: 10px 20px;
+  font-size: 100%;
+  line-height: 35px;
+}

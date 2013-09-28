@@ -1,0 +1,940 @@
+-# ============================ Introduction ============================
+= article(:part, :nobackground) do
+  %h1 Capybara drivers zoo or make friends with Poltergeist
+
+= article do
+  .notes
+    Добрый день! Я очень рад выступать на Railsclub!
+  %h1 Hi everyone!
+  %section
+    %pre
+      :preserve
+        people.each(&:handshake)
+        perfomance
+        expect(people.response).to be_positive
+  %h3 I'm glad to speak at RailsClub
+
+= article do
+  .notes
+    Меня зовут Дмитрий Воротилин. Я работаю в компании Evrone и благодаря им
+    провожу много времени работая над OS проектами в частности poltergeist,
+    мейнтейнером которого я не так давно стал. Так что спасибо им за эту
+    возможность, а также за поддержку и поощрение работы над OS внутри нашей
+    компании.
+  %h1 About me
+  %ul
+    %li I'm Dmitry Vorotilin
+    %li
+      %img{src: '/images/twitter.png', style: 'vertical-align: middle'} rO_Oute
+      %img{src: '/images/github.png', style: 'vertical-align: middle'} route
+    %li
+      I work at
+      %img{src: '/images/evrone.png', style: 'vertical-align: middle'}
+    %li I do OS (rails, poltergeist, quiet_assets, ...)
+
+
+= article(:nobackground) do
+  .notes
+    O чем я сегодня буду рассказывать. Если план слишком сложный все может
+    пойти наперекосяк...
+  %h3 If the plan gets too complex something always goes wrong. © Big Lebowski
+  %img{src: '/images/plan.jpg', width: '90%', style: 'margin-top: 1%'}
+
+
+= article do
+  .notes
+    Итак не очень сложный план. Мой доклад посвящен замечательному фреймворку
+    capybara и одному из самых распространенных драйверов для него poltergeist.
+  %h1 The simplest plan
+
+= article do
+  .notes
+    Сначала мы поговорим с вами о capybara, я расскажу о том как происходит
+    работа c драйвером по умолчанию rack-test.
+  %h3 Capybara
+  %img{src: '/images/capybara.jpg', height: '80%', style: 'margin-top: 1%'}
+
+
+= article do
+  .notes Затем об остальных драйверах и их особенностях.
+  %h3 Capybara drivers
+  %img{src: '/images/capybara_drivers.jpg', height: '80%', style: 'margin-top: 1%'}
+
+= article do
+  .notes
+    И основная часть моего доклада будет посвящена poltergeist. Я
+    практически уверен что все пишут тесты и не буду спрашивать вас о capybara,
+    но хочу узнать кто слышал что-нибудь о poltergeist? А теперь кто
+    использов(ал)/(ет) его? Ок, поехали дальше.
+  %h3 Poltergeist (with nearly headless Nichola... PhantomJS)
+  %img{src: '/images/poltergeist.jpg', height: '80%', style: 'margin-top: 1%'}
+
+
+-# ============================ Capybara ============================
+= article(:part, :nobackground) do
+  .notes И так начнем с capybara
+  %h1 Capybara
+
+
+= article do
+  .notes
+    Что бы узнать получше о работе и устройстве capybara, давайте создадим очень
+    простое Rack приложение и натравим на него капибару.
+  %h1 Let's create simple rack application and poke it with Capybara
+
+
+= article do
+  .notes
+    Вот так выглядит самое простое Rack приложение, которое должно отвечать
+    требованиям Rack, оно должно иметь метод call в который будет передаваться
+    CGI-like окружение. Результатом должен быть массив состоящий из трех
+    элементов - статус, набор хидеров для ответа и сам контент страницы. Если
+    мы инстанциируем этот класс, то как раз получим Rack приложение отвечающее
+    всем требованиям. У моих слайдов есть возможность выполнять код в runtime,
+    чем мы с вами сейчас и займемся. Все блоки кода на слайдах которые можно
+    выполнить выделены зеленой рамкой, так что если я увлекусь напомните мне
+    пожалуйста выполнить и показать вам результат.
+  %h1 Simple rack application
+  %section
+    %pre.ruby.executable
+      :preserve
+        class SimpleApp
+          def call(env)
+            [
+              200,
+              { 'Content-Type' => 'text/html' },
+              ['#{CGI.escapeHTML("<html><body>Text</body></html>")}']
+            ]
+          end
+        end
+
+
+= article do
+  .notes
+    Теперь давайте создадим вручную экземпляр сессии capybara, который принимает
+    два аргумента: название драйвера и Rack приложение, второй аргумент
+    опционален, потому что можно создавать сессию для сторонних/удаленных сайтов.
+  %h1 Capybara session
+  %section
+    %pre.ruby.executable
+      :preserve
+        require 'capybara'
+        @session = Capybara::Session.new(
+          :rack_test, SimpleApp.new
+        )
+
+
+= article do
+  .notes
+    Если вызвать метод visit и посмотреть body, то оно в точности будет
+    соответствовать последнему элементу массива.
+  %h1 Visiting root path
+  %section
+    %pre.ruby.executable
+      :preserve
+        @session.visit '/'
+        @session.body
+
+
+= article do
+  .notes
+    Можно проверить есть ли заданный контент на странице. Ну и конечно же
+    работают другие матчеры которые capybara предоставляет.
+  %h1 Does it have content?
+  %section
+    %pre.ruby.executable
+      :preserve
+        @session.has_content?('Text')
+  %section
+    %pre.ruby
+      :preserve
+        @session.has_css?(...)
+        @session.has_link?(...)
+        @session.has_button?(...)
+
+
+= article do
+  .notes
+    Давайте теперь проверим текущий url. Упс capybara говорит что это
+    http://www.example.com/ и сейчас не совсем понятно почему такой хост, но мы
+    обязательно разберемся с этим когда начнем рассматривать работу драйвера.
+  %h1 Current url
+  %section
+    %pre.ruby.executable
+      :preserve
+        @session.current_url
+
+
+= article do
+  .notes
+    Давайте рассмотрим как capybara работает с rack-test драйвером и нашим
+    приложением. Когда мы создаем сессию в инишиалайзере есть три параметра
+    которые определяют запуск сервера - Capybara.run_server, @app и
+    driver.needs_server? Первый это true по умолчанию, второй это rack
+    приложение, мы его тоже передали, но вот rack-test драйверу не нужен сервер
+    и в ответ на вызов driver.needs_server? он отдает false.
+  %h1 Capybara finds out if driver needs a server
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::Session
+          def initialize(mode, app=nil)
+            @mode = mode
+            @app = app
+            if (Capybara.run_server && @app &&
+              driver.needs_server?)
+              @server =
+                Capybara::Server.new(@app).boot
+
+
+= article do
+  .notes Можете убедиться.
+  %h1 We don't need it for rack_test
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::RackTest::Driver
+          def needs_server?
+            false
+          end
+
+
+= article do
+  .notes
+    На этом инициализация заканчивается и раз ничего запускать не нужно вся
+    основная логика выполняется когда мы вызываем метод visit. Я опустил немного
+    кода там где многоточие, чтобы сфокусироваться и указать самые основные
+    моменты. Как мы видим visit в итоге вызывается у драйвера, а затем у browser
+    с заданными аргументами.
+  %h1 Everything happens on visit call
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::Session
+          def visit(url)
+            ...
+            driver.visit(url)
+
+        class Capybara::RackTest::Driver
+          def visit(path, attributes = {})
+            browser.visit(path, attributes)
+          end
+
+
+= article do
+  .notes
+    Чтобы написать драйвер для capybara нужно реализовать интерфейс абстрактного
+    драйвера который можно найти в исходниках. Обычно драйвера реализуют
+    вспомогательный Browser класс который и выполняет все необходимую работу,
+    где класс Driver представляет собой интерфейс для взаимодействия с драйвером
+    и проксирует большинство вызовов на него Browser. Здесь мы видим что
+    вызывается метод process_and_follow_redirects первым параметром которого идет
+    get потому что visit это всегда GET запрос. В начале объявления класса
+    инклюдятся rack-test методы, мы вернемся к этому вопросу чуть позже.
+  %h1 Later in Browser
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::RackTest::Browser
+          include ::Rack::Test::Methods
+
+          def visit(path, attributes = {})
+            ...
+            process_and_follow_redirects(
+              :get, path, attributes
+            )
+          end
+
+
+= article do
+  .notes
+    Как видно из названия задача этого метода заключается в том чтобы сделать
+    запрос и если у последнего был статус редирект то сходить еще и на этот url.
+    Видите что берется Location из хидеров респонса?
+  %h1 Follow the wave
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::RackTest::Browser
+          def process_and_follow_redirects(...)
+            process(method, path, attributes, env)
+            if driver.follow_redirects?
+              ...
+              if last_response.redirect?
+                process(
+                  :get,
+                  last_response["Location"],
+                  {},
+                  env
+                )
+
+
+= article do
+  .notes
+    Метод process это обертка над методами rack-test, тот модуль что мы видели
+    добавляет такие методы как get, post, put и т.д. То есть в этой точке
+    управление передается rack-test который уже непосредственно и работает с
+    нашим приложением.
+  %h1 Which will call rack-test's method get
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::RackTest::Browser
+          def process(...)
+            ...
+            send(
+              method,
+              new_uri.to_s,
+              attributes,
+              env.merge(options[:headers] || {})
+            )
+          end
+
+
+= article do
+  .notes
+    Я не буду вдаваться в детали реализации rack-test там не очень много кода
+    и вы можете сами все увидеть своими глазами, основная фишка - это то что он
+    помогает управляться с куками, следует по редиректам, имеет методы для
+    бейсик авторизации и т.д., в общем очень полезная вещь. Принцип работы у
+    него такой, ВНИМАНИЕ!, - он берет экземпляр приложения и вызывает call :))
+    формирует респонс который вы в итоге и видите.
+  %h1
+    All in all we invoke
+    %code `call`
+  %section
+    %pre.ruby
+      :preserve
+        class Rack::MockSession
+          def request(uri, env)
+            ...
+            @last_request = Rack::Request.new(env)
+            status, headers, body = @app.call(
+              @last_request.env
+            )
+            @last_response = MockResponse.new(
+              status, headers, body,
+              env["rack.errors"].flush
+            )
+            ...
+          end
+
+
+= article do
+  .notes
+    Давайте вспомним как мы оказались в этой точке и пройдемся по трейсу.
+    Сначала создается экземпляр сессии у которого мы вызываем метод visit,
+    выбирается какой драйвер будет использован(в нашем случае это rack-test)
+    драйвер передает вызов дальше в класс Browser в который уже примешаны методы
+    rack-test, затем стек доходит до самого rack-test который формирует нужное
+    rack приложению окружение и вызывает у него call, получая при этом response.
+    Теперь если вы помните example.com в роли хоста то теперь становится понятно
+    что хост большой роли не играет потому что приложение в действительности не
+    работает ни на каком хосту/порту и запрос для него придет наважно какой хост
+    мы установим. Приложение у нас одно и call мы вызываем сами.
+  %h1 Trace
+  %ul
+    %li Session#visit
+    %li Driver#visit
+    %li Browser#visit
+    %li Browser#process_and_follow_redirects
+    %li Browser#get
+    %li Rack::Test::Session#get
+    %li Rack::Test::Session#process_request
+    %li Rack::MockSession#request
+
+
+= article do
+  .notes
+    Для интеграции с rspec capybara подмешивает DSL методы, которые будут
+    доступны во время выполнения теста.
+  %h1 Rspec integration
+  %section
+    %pre.ruby
+      :preserve
+        # capybara/rspec.rb
+
+        RSpec.configure do |config|
+          config.include(
+            Capybara::DSL, type: :feature
+          )
+          config.include(
+            Capybara::RSpecMatchers, type: :feature
+          )
+
+
+= article do
+  .notes
+    Если мы используем capybara для rails/rack приложения например, то сессия
+    для нас создается автоматически и все вызовы методов типа visit, find и т.д.
+    вызываются у page который по сути и является сессией.
+  %h1 Capybara creates session automatically
+  %section
+    %pre.ruby
+      :preserve
+        module Capybara::DSL
+          def page
+            Capybara.current_session
+          end
+
+          Session::DSL_METHODS.each do |method|
+            define_method method do |*args, &block|
+              page.send method, *args, &block
+            end
+          end
+
+
+-# ============================ Drivers ============================
+= article(:part, :nobackground) do
+  .notes
+    Теперь после того как мы разобрались с принципами работы capybara и одним из
+    ее драйверов, хорошо бы узнать о других драйверах, их достоинствах и
+    недостатках.
+  %h1 Drivers
+
+
+= article do
+  .notes
+    Мне известно только о драйверах из этого списка. Сейчас мы пройдемся по
+    каждому.
+  %h1 Drivers
+  %ul
+    %li RackTest
+    .build
+      %li Capybara-mechanize
+      %li Selenium
+      %li Capybara-webkit
+      %li Poltergeist
+
+
+= article do
+  .notes
+    Мы с вами разобрали работу этого драйвера и все пункты должны быть очевидны,
+    конечно он руби only, не использует никаких сторонних библиотек и не
+    запускает других процессов. Он быстрый так как не нужно запускать
+    полноценный браузер и взаимодействовать с ним. Конечно этот драйвер без
+    поддержки js, это может быть как плюсом так и минусом. С одной стороны это
+    ускоряет прохождение теста, с другой стороны среда неполноценная и мы можем
+    не заметить каких то багов которые проявляются только в реальных браузерах
+    с js. Ну и конечно нет remote access потому что мы работаем с нашим
+    приложением напрямую без использования сокетов и http протокола.
+  %h1 Rack-test
+  %ul
+    %li
+      Pros
+      %ul
+        %li Ruby only
+        %li Fast
+    %li
+      Cons
+      %ul
+        %li No JS
+        %li No remote access
+
+
+= article do
+  .notes
+    Этот драйвер практически не отличается от предыдущего, единственный плюс
+    добавилась поддержка запросов на удаленные сервера, которые выполняются
+    посредством mechanize, тоже без поддержки js.
+  %h1 Capybara-mechanize
+  %ul
+    %li
+      Pros
+      %ul
+        %li Ruby only
+        %li Fast
+        %li Remote access
+    %li
+      Cons
+      %ul
+        %li Still no JS
+
+
+= article do
+  .notes
+    Selenium реализует поддержку браузеров через протокол WebDriver где это
+    возможно. Все спецификации этого протокола что я видел все еще в draft. Для
+    Firefox используется xpi plugin который идет вместе с selenium-webdriver
+    джемом, и все работает из коробки, когда как для хрома нужно скачивать
+    chromedriver который запускает отдельный процесс для коммуникации с хромом.
+    Плюсом является поддержка реальных браузеров которыми мы сами пользуемся,
+    но и не только их. Так как работа идет с полноценными браузерами то конечно
+    же весь js код и доступ к сторонним сайтам работает. Минусом конечно то что
+    скорость прогона тестов значительно ниже и то что требуется полноценный GUI
+    или фреймбуфер для запуска. Но это зависит от браузера который мы вибираем
+    для selenium.
+  %h1 Selenium
+  %h3 https://dvcs.w3.org/hg/webdriver/raw-file/default/webdriver-spec.html
+  %ul
+    %li
+      Pros
+      %ul
+        %li Supports many browsers (WebDriver)
+        %li Remote access (of course)
+        %li JS
+    %li
+      Cons
+      %ul
+        %li Slow
+        %li Needs X or Xvfb (it depends)
+
+
+= article do
+  .notes
+    capybara-webkit использует QtWebKit, это порт WebKit для QT, так что для
+    установки этого гема в системе должны стоять соотвествующие системные
+    библиотеки, QT и X. Так как это полноценный браузер то конечно есть
+    поддержка всего необходимого функционала. Из минусов то что для запуска
+    требуются иксы или фреймбуфер.
+  %h1 Capybara-webkit
+  %ul
+    %li
+      Pros
+      %ul
+        %li Remote access (of course)
+        %li JS
+    %li
+      Cons
+      %ul
+        %li Slow
+        %li Needs X and Xvfb
+
+
+= article do
+  .notes
+    Ну и наконец poltergeist использует PhantomJS в качестве браузера, которому
+    не требуется GUI, он обладает полным функционалом и еще кучей полезных фич
+    для полного контроля за прохождением теста.
+  %h1 Poltergeist
+  %ul
+    %li
+      Pros
+      %ul
+        %li Remote access (of course)
+        %li Truly headless
+        %li JS
+    %li
+      Cons
+      %ul
+        %li Slow, but faster than the others
+
+
+-# ============================ Poltergeist ============================
+= article(:part, :nobackground) do
+  .notes Теперь поговорим о poltergeist.
+  %h1 Poltergeist
+
+
+= article do
+  .notes
+    Как он работает и в чем его отличие от остальных драйверов?
+  %h1 How does it work?
+
+
+= article do
+  .notes
+    Как я уже сказал он использует все приемущества PhantomJS, который является
+    headless браузером c js API и поддерживает все то что и обычный браузер
+  %h1 PhantomJS
+  %h3
+    PhantomJS is a headless WebKit scriptable with a JavaScript API. It has fast
+    and native support for various web standards: DOM handling, CSS selector,
+    JSON, Canvas, and SVG.
+
+
+= article do
+  .notes
+    Установить его можно практически без зависимостей за исключением одной
+    библиотечки по работе с шрифтами, потому что нам все таки нужно рендерить
+    шрифты на веб страничке. Возможно PhantomJS есть уже в вашем любимом
+    менеджере пакетов, либо вы можете скачать уже скомпиленный для нужной OS,
+    либо можете собрать из сорцов.
+  %h1 Install
+  %h3 (almost without dependencies)
+  %ul
+    %li With your favorite package manager
+    %li Binary packages at http://code.google.com/p/phantomjs/downloads/list
+    %li From source :)
+
+
+= article do
+  .notes
+    Давайте посмотрим как работает PhantomJS без poltergeist и создадим
+    небольшой скриптик на кофе. Видим что реквайрится модуль webpage и создается
+    вебстраничка, она пока из себя ничего не представляет, практически
+    about:blank. Открываем заданный урл и мы уже можем посмотреть контент
+    страницы или даже сделать скриншот.
+  %h1 Create simple script
+  %section
+    %pre.coffeescript
+      :preserve
+        page = require('webpage').create()
+        url = 'http://evrone.com'
+        page.open url, ->
+          # Body
+          console.log(page.frameContent)
+          # Screenshot
+          page.render('screen.png')
+          phantom.exit()
+
+
+= article do
+  .notes
+    Запускаем PhantomJS с путем до нашего скрипта в качестве первого аргумента и
+    видим результат.
+  %h1 Run it
+  %section
+    %pre.sh
+      :preserve
+        $ phantomjs simple.js
+
+
+= article do
+  .notes
+    Тогда возникает разумный вопрос, как же poltergeist взаимодействует с
+    PhantomJS.
+  %h3 Reasonable question:
+  %h1 How does Poltergeist communicate with PhantomJS?
+
+
+= article do
+  .notes Давайте посмотрим на это взаимодействие.
+  %h1 Let's see it in action
+
+
+= article do
+  .notes
+    Регистрируем poltergeist драйвер для capybara c именем poltergeist в общем
+    то имя здесь не особо важно и можете дать любое на свой вкус. Заметьте что
+    в блоке будет создаваться экземпляр Driver в который передается инстанс
+    приложения. Ну и затем создаем новую сессию.
+  %h1 Register new driver
+  %section
+    %pre.ruby.executable
+      :preserve
+        require 'capybara/poltergeist'
+
+        name = :poltergeist # whatever name
+        Capybara.register_driver(name) do |app|
+          Capybara::Poltergeist::Driver.new(app)
+        end
+
+        @session = Capybara::Session.new(
+          name, SimpleApp.new
+        )
+
+
+= article do
+  .notes
+    В этот раз инициализация уже немного отличается от предыдущей, потому что
+    драйверу уже нужен сервер. capybara инстанциирует свой сервер и вызывает
+    метод boot.
+  %h1 Capybara runs server this time
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::Session
+        def initialize(mode, app = nil)
+          ...
+          if Capybara.run_server && @app &&
+            driver.needs_server?
+              @server = Capybara::Server.
+                new(@app).boot
+          else
+            @server = nil
+
+
+= article do
+  .notes
+    Если удалить посторонний шум из кода то получится что мы запускаем
+    приложение в новом треде где middleware это наш app обвернутый в middleware
+    от capybara которое используется для того чтобы проверить запущено
+    приложение или нет. И соотвественно порт понятно для каких целей.
+  %h1 Run server in new tread
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::Server
+        def boot
+          ...
+          @server_thread = Thread.new do
+            Capybara.server.call(@middleware, @port)
+          end
+
+
+= article do
+  .notes capybara.server это блок который мы вызываем методом call
+  %h1 Server is a block
+  %section
+    %pre.ruby
+      :preserve
+        Capybara.server do |app, port|
+          Capybara.run_default_server(app, port)
+        end
+
+
+= article do
+  .notes
+    run_default_server это WEBrick hadler который запускает наше приложение
+    на заданном хосту/порту, то есть идет запуск реального WEBrick сервера для
+    нашего приложения.
+  %h1 Start WEBrick on given host/port
+  %section
+    %pre.ruby
+      :preserve
+        module Capybara
+          def self.run_default_server(app, port)
+            require 'rack/handler/webrick'
+            Rack::Handler::WEBrick.run(
+              app, Host: server_host, Port: port, ...
+            )
+          end
+
+
+= article do
+  .notes
+    Давайте попробуем и в этот раз выполнить visit. Как видите все проходит
+    успешно но в этот раз чуть дольше потому что запускается PhantomJS и
+    приходится с ним обмениваться данными. Так же добавилась секция head которой
+    не было у нас в ответе, это уже результат того что наша страница была
+    отрендерна полноценным браузером.
+  %h1 Do you still remember visit?
+  %section
+    %pre.ruby.executable
+      :preserve
+        @session.visit '/'
+        @session.body
+
+
+= article do
+  .notes
+    Так как сейчас все происходит в живую то можно посмотреть список процессов и
+    убедиться что запущен PhantomJS. Как видно из ответа phantomjs запущен с pid
+    номер, в качестве аргументов ему передан main.js затем порт сервера (о нем
+    немного позже) и размер окна для рендеринга страницы.
+  %h1 Poltergeist runs PhantomJS
+  %section
+    %pre.sh.executable
+      :preserve
+        ps -eo pid,command | grep phantomj[s]
+
+
+= article do
+  .notes
+    Как мы помним из примера для rack-test capybara вызывает driver.visit и
+    управление передается драйверу который мы зарегистрировали ранее. Я уже
+    показывал вспомогательную диаграмму классов для драйверов и вы уже знаете
+    назначение класса Browser остается узнать что такое server и client.
+  %h1 Inside Driver
+  %section
+    %pre.ruby
+      :preserve
+        module Capybara::Poltergeist
+          class Driver < Capybara::Driver::Base
+            def visit(url)
+              @started = true
+              # browser is an instance of:
+              # Browser.new(server, client, ...)
+              browser.visit(url)
+            end
+
+
+= article do
+  .notes
+    Начнем пожалуй с client потому что он запускает PhantomJS. Как видно в метод
+    класса start передается ряд параметров и некоторые из них мы уже видели.
+    Далее выполняется Process.spawn с первым параметром в качестве пути до
+    phantomjs, далее номером порта и размер окна, который запускает новый
+    процесс.
+  %h1 Spawning a new process
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::Poltergeist::Driver
+          def client
+            @client ||= Client.start(server,
+              path: options[:phantomjs],
+              window_size: options[:window_size],
+              phantomjs_options: phantomjs_options
+              ...
+
+        class Capybara::Poltergeist::Client
+          def start
+            ...
+            @pid = Process.spawn(
+              *command.map(&:to_s), process_options
+            )
+
+
+= article do
+  .notes
+    Тот скрипт main.js который передавался в качестве аргумента, проводит ряд
+    вспомогательных действий в том числе инстациирует Poltergeist.Connection
+    который создает новый веб сокет на котором слушает входящие
+    сообщения/команды выполняет их и отсылает результат назад серверу. Так же
+    теперь понятно назначение порта - это порт который слушает сервер и к
+    которому подключается вебсокет PhantomJS.
+  %h1 Somewhere inside PhantomJS
+  %section
+    %pre.coffeescript
+      :preserve
+        class Poltergeist.Connection
+          constructor: (@owner, @port) ->
+            @socket = new WebSocket(
+              "ws://127.0.0.1:#{@port}/"
+            )
+            @socket.onmessage = (message) =>
+              @owner.runCommand(
+                JSON.parse(message.data)
+              )
+
+          send: (message) ->
+            @socket.send(JSON.stringify(message))
+
+
+= article do
+  .notes Ответ вебсокеты!
+  %h3 The answer:
+  %h1 WebSockets
+
+
+= article do
+  .notes
+    Теперь давайте посмотрим что из себя представляет сервер, видим все тот же
+    порт на котором произойдет запуск сервера и создание WebSocketServer.
+  %h1 Running server
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::Poltergeist::Driver
+          def server
+            @server ||= Server.new(
+              options[:port],
+              options.fetch(:timeout) {
+                DEFAULT_TIMEOUT
+                ...
+
+        class Capybara::Poltergeist::Server
+          def start
+            @socket = WebSocketServer.new(
+              fixed_port, timeout
+            )
+          end
+
+
+= article do
+  .notes
+    Прежде чем перейти к рассмотрению реализации WebSocketServer давайте
+    пройдемся по требованиям к вебсокет серверу. Конечно сервер должен знать о
+    спецификации этого протокола, он должен быть асинхронным в силу природы
+    вебсокетов, и должен держать много постоянных соединений.
+  %h1 WebSocket Server Requirements:
+  %ul
+    %li It must know how to parse WebSocket handshake and frames
+    %li It must be asynchronous and nonblocking
+    %li It must be able to hold many persistent connections
+
+
+= article do
+  .notes
+    Конкретно для нашего случая подходят ли нам все эти требования? С учетом
+    того что мы знаем что клиент у нас будет только один, да и асинхронизм нам
+    тоже не нужен ведь мы же не можем напулять команд для PhantomJS как из
+    пулемета и ждать результат их выполнения непонятно когда. Поэтому
+    WebSocketServer сделан так чтобы команды выполнялись синхронно, т.е.
+    посылаем request и ждем response. Для работы с вебсокетами есть отличный гем
+    websocket-driver который абстрагирует нас от знаний деталей протокола
+    WebSockets, мы предоставляем объект этому гему который реализует необходимый
+    интерфейс и можем пользоваться вебсокетами. Из кода видим что при послылке
+    сообщения клиенту дрейвер выолняет receive и ждет ответа от PhantomJS если
+    ответа не приходит будет рейз по таймауту.
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::Poltergeist::WebSocketServer
+          def accept
+            @socket = server.accept
+            @driver = WebSocket::Driver.server(self)
+            @driver.on(:message) {|e|
+              @messages << e.data } ...
+
+          def send(message)
+            accept unless connected?
+            driver.text(message)
+            receive ...
+
+          def receive
+            start = Time.now
+            until @messages.any?
+              raise Errno::EWOULDBLOCK if (Time.now - start) >= timeout
+              IO.select([socket], [], [], timeout)
+                or raise Errno::EWOULDBLOCK ...
+
+
+= article do
+  .notes
+    Если мы заглянем в Browser то увидим что visit это отправка команды visit с
+    параметром url. Обворачиваем в JSON и отправляем серверу.
+  %h1 Inside Browser
+  %section
+    %pre.ruby
+      :preserve
+        class Capybara::Poltergeist::Browser
+          def visit(url)
+            # message = {
+            #   'name' => name,
+            #   'args' => args
+            # }
+            # JSON.load(
+            #   server.send(
+            #     JSON.dump(message)
+            #   )
+            # )
+            command 'visit', url
+          end
+
+
+= article do
+  %h1 Inside PhantomJS
+  %section
+    %pre.coffeescript
+      :preserve
+        class Poltergeist.Browser
+          visit: (url) ->
+            ...
+            @page.open(url)
+
+
+= article do
+  %h1 Trace
+  %ul
+    %li Capybara::Session#new
+    %li Capybara::Server\#{new, call}
+    %li Session#visit
+    %li Driver#visit
+    %li Server#new
+    %li Client#new
+    %li Browser#visit
+    %li Server <== JSON ==> Client (PhantomJS)
+
+
+= article do
+  %h1 Profit:
+  %ul
+    %li PhantomJS is lightweight and fast
+    %li Don't hustle with dependencies
+    %li The same driver on all machines including CI/Travis
+    %li Total control over the whole process
+    %li Don't forget about automation
+
+
+= article do
+  %h1 Thank you!
+
+
+= article do
+  %h1 Sweets
+  %ul
+    %li Introducing the Qt WebEngine
+    %li QPA - The Qt Platform Abstraction
